@@ -4,6 +4,9 @@
 // repository into /output, where the house reads it. It warns (but does not
 // fail) when the address is still the placeholder, so a draft run stays
 // checkable while an unfilled VIDEO.json can never slip through quietly.
+// After copying, it reads the output back and compares it with the source
+// byte for byte: a truncated or partial copy must fail loudly here instead
+// of handing the house a broken VIDEO.json.
 //
 // Run it locally the way the kit documents:
 //   mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
@@ -32,7 +35,19 @@ try {
 }
 
 mkdirSync(outDir, { recursive: true });
-copyFileSync(sourcePath, join(outDir, 'VIDEO.json'));
+const copiedPath = join(outDir, 'VIDEO.json');
+copyFileSync(sourcePath, copiedPath);
+
+// Confirm the copy landed whole: compare the bytes we wrote with the bytes
+// we read, and refuse to report success on a mismatch.
+const written = readFileSync(copiedPath);
+const original = readFileSync(sourcePath);
+if (!written.equals(original)) {
+  console.error(
+    `gta6-clipper-01: VIDEO.json copy to ${copiedPath} does not match the source (${written.length} bytes written, ${original.length} bytes expected)`,
+  );
+  process.exit(1);
+}
 
 if (typeof video.url !== 'string' || !YOUTUBE_ADDRESS.test(video.url)) {
   console.warn(
